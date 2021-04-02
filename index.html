@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+
+<html>
+Paste each peer's SDP here:
+<input id="SDP"></input>
+<button id="sdpButton" onclick="window.startSession()">Click to connect to peer</button>
+<button id="newPeerButton" onclick="newPeer()">Click To Add peerConnection</button>
+<div id="logs"></div>
+<div id="remoteVideos"></div>
+
+<video id="myVid" playsinline controls muted autoplay width height style="padding-top:0px; margin:0px;"></video>
+<script>
+
+  const log = msg => {
+    document.getElementById('logs').innerHTML += msg + '<br>'
+  }
+
+  function clearLog(){
+    document.getElementById('logs').innerHTML = '<br>';
+  }
+//================WEBRTC Video=======================
+function newPeer(){
+  clearLog();
+  document.getElementById("sdpButton").value = "";
+  const pc = new RTCPeerConnection({
+    iceServers: [{
+      urls: 'stun:stun.l.google.com:19302'
+    }]
+  })
+
+  //Add User's Vid/ Audio
+  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+     .then(function(stream) {
+         document.getElementById('myVid').srcObject = stream;
+         console.log(stream);
+         stream.getTracks().forEach(track => pc.addTrack(track, stream));
+     })
+     .catch(function(err) {
+         console.log("An error occurred: " + err);
+     });
+
+  pc.ontrack = event => {
+    const el = document.createElement(event.track.kind);
+    el.srcObject = event.streams[0];
+    el.autoplay = true;
+    el.controls = true;
+    el.muted = true;
+    document.getElementById('remoteVideos').appendChild(el);
+    console.log(event);
+  }
+
+  pc.onsignalingstatechange = function(e){
+    if(pc.signalingState == "have-remote-offer"){
+      pc.createAnswer().then(d => pc.setLocalDescription(d)).catch(console.log)
+    }
+  }
+  pc.oniceconnectionstatechange = function(e){
+    console.log(pc.connectionState);
+    /*
+    if(pc.connectionState == "connected" || pc.connectionState == "stable"){
+      clearLog();
+      log("Ready for next peer");
+      newPeer();
+    }
+    */
+  }
+  pc.onicecandidate = event => {
+    if (event.candidate === null) {
+      log(JSON.stringify(pc.localDescription));
+    }
+  }
+
+  window.startSession = () => {
+    const sd = document.getElementById('SDP').value;
+    if (sd === '') {
+      //Generate new one
+      log("Generating your SDP: \n")
+      pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+
+    }
+    try {
+      pc.setRemoteDescription( new RTCSessionDescription(JSON.parse(sd)) ).catch(console.log);
+      clearLog();
+
+      console.log(sd);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+}
+newPeer();
+
+/*
+// Offer to receive 1 audio, and 1 video tracks
+pc.addTransceiver('audio', {
+  'direction': 'recvonly'
+})
+pc.addTransceiver('video', {
+  'direction': 'recvonly'
+})
+
+pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log);
+//log(pc.localDescription);
+*/
+
+
+
+</script>
+</html>
